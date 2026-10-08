@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-LilyHackathonApplication<lily-hackathon>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.lily.hackathon.LilyHackathonApplication",
+            "projectName": "lily-hackathon",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
