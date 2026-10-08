@@ -16,6 +16,7 @@ export type IconProps = {
     | "help"
     | "image"
     | "phone"
+    | "user"
     | "close";
   className?: string;
 };
@@ -89,6 +90,12 @@ export function Icon({ name, className = "h-5 w-5" }: IconProps) {
     ),
     phone: (
       <path d="M5.4 3.5 8.7 3l1.6 4.2-2.1 1.6a15.8 15.8 0 0 0 7 7l1.6-2.1 4.2 1.6-.5 3.3c-.2 1.1-1.1 1.9-2.2 1.9C10.1 20.5 3.5 13.9 3.5 5.7c0-1.1.8-2 1.9-2.2Z" />
+    ),
+    user: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+      </>
     ),
     close: <path d="m6 6 12 12M18 6 6 18" />,
   };

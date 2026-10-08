@@ -15,6 +15,8 @@ export type Medication = {
   times: string[];
   // "YYYY-MM-DD" the prescription started, so earlier days are not counted as missed
   createdOn: string;
+  // Tablets (or other units) left; undefined when the carer is not tracking stock
+  stock?: number;
 };
 
 export type LogEntry = {
@@ -28,17 +30,48 @@ export type LogEntry = {
   recordedAt: number;
 };
 
+export type PatientTheme = "light" | "high-contrast" | "dark";
+export type TextSize = "standard" | "large" | "extra-large";
+
 export type Settings = {
   carerName: string;
+  carerPhone: string;
+  carerEmail: string;
+  carerRelationship: string;
+  carerAvailability: string;
   patientName: string;
+  patientAge: string;
+  disabilities: string;
+  medicalNeeds: string;
   remindersOn: boolean;
+  soundAlerts: boolean;
   doctorPhone: string;
   nursePhone: string;
+  // How the patient view is presented
+  patientTheme: PatientTheme;
+  textSize: TextSize;
+  readAloud: boolean;
+  colourSafe: boolean;
+  reducedMotion: boolean;
+  simplifiedLayout: boolean;
+  // Whether the patient may record doses and add medicines themselves
+  allowMedicineChanges: boolean;
+  consentGiven: boolean;
+  consentMethod: string;
+  // "YYYY-MM-DD"
+  consentDate: string;
+};
+
+export type Incident = {
+  id: number;
+  note: string;
+  recordedAt: number;
 };
 
 export type CareState = {
   medications: Medication[];
   log: LogEntry[];
+  incidents: Incident[];
   settings: Settings;
   // dose key -> time (ms) the carer asked to be reminded again
   snoozes: Record<string, number>;
@@ -112,6 +145,18 @@ export function formatLogTime(entry: LogEntry, now: number): string {
           ? recorded.toLocaleDateString(undefined, { weekday: "short" })
           : recorded.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return `${day}, ${formatClock(entry.recordedAt)}`;
+}
+
+export const LOW_STOCK_DAYS = 3;
+
+// "2 tablets" uses two units of stock per dose; anything unreadable counts as one
+export const unitsPerDose = (medication: Medication) => parseFloat(medication.quantity) || 1;
+
+export function daysOfStock(medication: Medication): number | null {
+  if (medication.stock === undefined) return null;
+  return Math.floor(
+    medication.stock / (unitsPerDose(medication) * Math.max(1, medication.times.length)),
+  );
 }
 
 export const doseKey = (medicationId: number, date: string, time: string) =>
@@ -206,6 +251,34 @@ export function logToCsv(log: LogEntry[]): string {
   return ["Date,Scheduled time,Medicine,Dosage,Status,Reason,Recorded at", ...rows].join("\n");
 }
 
+export function defaultSettings(): Settings {
+  return {
+    carerName: "Meera",
+    carerPhone: "07123 456 789",
+    carerEmail: "meera@example.com",
+    carerRelationship: "Family carer",
+    carerAvailability: "Primary daytime contact",
+    patientName: "Asha",
+    patientAge: "63",
+    disabilities: "Reduced vision and difficulty distinguishing some colours",
+    medicalNeeds: "Blood pressure monitoring and blood sugar support",
+    remindersOn: true,
+    soundAlerts: true,
+    doctorPhone: "",
+    nursePhone: "",
+    patientTheme: "high-contrast",
+    textSize: "large",
+    readAloud: true,
+    colourSafe: true,
+    reducedMotion: true,
+    simplifiedLayout: true,
+    allowMedicineChanges: false,
+    consentGiven: false,
+    consentMethod: "Confirmed directly by patient",
+    consentDate: dateKey(Date.now()),
+  };
+}
+
 // Sample care plan with a week of history so the dashboard has something to show on first run
 export function sampleState(): CareState {
   const today = dateKey(Date.now());
@@ -221,6 +294,7 @@ export function sampleState(): CareState {
       color: medicationColors[0],
       times: ["08:00"],
       createdOn,
+      stock: 28,
     },
     {
       id: 2,
@@ -232,6 +306,7 @@ export function sampleState(): CareState {
       color: medicationColors[1],
       times: ["08:30"],
       createdOn,
+      stock: 3,
     },
     {
       id: 3,
@@ -243,6 +318,7 @@ export function sampleState(): CareState {
       color: medicationColors[2],
       times: ["13:00"],
       createdOn,
+      stock: 30,
     },
   ];
 
@@ -259,7 +335,7 @@ export function sampleState(): CareState {
         date,
         time,
         status: missed ? "missed" : "taken",
-        reason: missed ? "Eleanor refused to take the medicine" : undefined,
+        reason: missed ? "Asha refused to take the medicine" : undefined,
         recordedAt: timeOn(date, time) + (missed ? 0 : (index + 2) * 120000),
       });
     });
@@ -268,13 +344,8 @@ export function sampleState(): CareState {
   return {
     medications,
     log,
-    settings: {
-      carerName: "Sarah Jones",
-      patientName: "Eleanor",
-      remindersOn: true,
-      doctorPhone: "",
-      nursePhone: "",
-    },
+    incidents: [],
+    settings: defaultSettings(),
     snoozes: {},
   };
 }
@@ -284,7 +355,13 @@ export function loadState(): CareState {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : null;
     if (parsed && Array.isArray(parsed.medications) && Array.isArray(parsed.log) && parsed.settings) {
-      return { ...parsed, snoozes: parsed.snoozes ?? {} };
+      // Plans saved before the patient setup screens existed are missing the newer fields
+      return {
+        ...parsed,
+        incidents: parsed.incidents ?? [],
+        settings: { ...defaultSettings(), ...parsed.settings },
+        snoozes: parsed.snoozes ?? {},
+      };
     }
   } catch {
     // Unreadable or blocked storage falls back to the sample plan
