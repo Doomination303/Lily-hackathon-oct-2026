@@ -13,9 +13,5 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      // Spring Boot backend
-      '/api': 'http://localhost:8080',
-    },
   },
 })
